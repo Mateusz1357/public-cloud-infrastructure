@@ -1,0 +1,122 @@
+Parameters: 
+  VPCID:
+    Description: VPC ID
+    Type: "AWS::EC2::VPC::Id"
+  SubnetID: 
+    Description: Subnet ID
+    Type: "AWS::EC2::Subnet::Id"
+  SubnetID2: 
+    Description: Subnet ID
+    Type: "AWS::EC2::Subnet::Id"
+
+Resources:
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EC2
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        SourceSecurityGroupId: 
+            !GetAtt ELBSecurityGroup.GroupId
+          
+  MyInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b5eea76982371e91
+      InstanceType: t2.micro
+      SubnetId: !Ref SubnetID
+      SecurityGroupIds:
+        - !GetAtt EC2SecurityGroup.GroupId
+      UserData:
+        Fn::Base64:  |
+            #!/bin/bash
+            sudo yum update -y
+            sudo amazon-linux-extras install nginx1 -y
+            sudo systemctl enable nginx
+            sudo systemctl start nginx
+            echo '<h1>Hello World</h1>' > /usr/share/nginx/html/index.html
+
+  MyInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b5eea76982371e91
+      InstanceType: t2.micro
+      SubnetId: !Ref SubnetID2
+      SecurityGroupIds:
+        - !GetAtt EC2SecurityGroup.GroupId
+      UserData:
+        Fn::Base64:  |
+            #!/bin/bash
+            sudo yum update -y
+            sudo amazon-linux-extras install nginx1 -y
+            sudo systemctl enable nginx
+            sudo systemctl start nginx
+            echo '<h1>Hello World</h1>' > /usr/share/nginx/html/index.html
+
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: EC2TargetGroup
+      Port: 80
+      Protocol: HTTP
+      Targets:
+      - Id: !Ref MyInstance
+        Port: 80
+      - Id: !Ref MyInstance2
+        Port: 80
+      VpcId: !Ref VPCID 
+  
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+      - !Ref SubnetID
+      - !Ref SubnetID2
+      SecurityGroups:
+        - !GetAtt ELBSecurityGroup.GroupId
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: 12345testflowlogs12345
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+          Rule: 
+            DefaultRetention: 
+                Days: 7
+                Mode: COMPLIANCE           
+     
+  MyFlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      LogDestinationType: s3
+      LogDestination: !GetAtt S3Bucket.Arn
+      ResourceId: !Ref VPCID
+      ResourceType: VPC
+      TrafficType: ALL
