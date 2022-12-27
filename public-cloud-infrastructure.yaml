@@ -107,7 +107,7 @@ Resources:
         Status: Enabled
       ObjectLockEnabled: true
       ObjectLockConfiguration:
-           ObjectLockEnabled: Enabled
+          ObjectLockEnabled: Enabled
           Rule: 
             DefaultRetention: 
                 Days: 7
