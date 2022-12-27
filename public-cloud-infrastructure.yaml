@@ -101,7 +101,7 @@ Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: 12345testflowlogs12345
+      BucketName: 123456testflowlogs123456
       AccessControl: Private
       VersioningConfiguration:
         Status: Enabled
